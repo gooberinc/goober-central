@@ -10,6 +10,7 @@ from datetime import datetime
 import requests
 from typing import Optional
 from pathlib import Path
+import uuid
 import requests
 import json
 import hashlib
@@ -21,6 +22,7 @@ from threading import Thread
 from fastapi import FastAPI
 from datetime import datetime
 from dotenv import load_dotenv
+
 
 app = FastAPI()
 origins = [
@@ -41,9 +43,11 @@ print(f"BASE_DIR: {BASE_DIR}")
 load_dotenv()
 app = FastAPI()
 
-# path to bot.py and the stupid version file
+# path to bot.py and the stupid version file + tokens
 BOT_FILE_PATH = os.path.join(BASE_DIR, 'static', 'goob', 'bot.py')
 LATEST_VERSION_PATH = os.path.join(BASE_DIR, 'static', 'latest_version.json')
+TOKENS_FILE_PATH = os.path.join(BASE_DIR, "tokens.json")
+
 
 # stupid ass hash thing i regret making this
 def calculate_file_hash(file_path):
@@ -64,6 +68,16 @@ def update_version_file(file_hash):
     with open(LATEST_VERSION_PATH, "w") as version_file:
         json.dump(current_data, version_file, indent=4)
 
+def load_tokens():
+    if os.path.exists(TOKENS_FILE_PATH):
+        with open(TOKENS_FILE_PATH, "r") as file:
+            return json.load(file)
+    return {}
+
+# Function to save the tokens to the file
+def save_tokens(tokens):
+    with open(TOKENS_FILE_PATH, "w") as file:
+        json.dump(tokens, file, indent=4)
 
 
 # this basically watches bot.py for changes and updates the hash automatically
@@ -114,6 +128,9 @@ TELEGRAM_ENABLED = os.getenv("use_telegram")
 def ensure_log_file():
     if not os.path.exists(LOG_FILE):
         with open(LOG_FILE, "w") as f:
+            json.dump([], f)
+    if not os.path.exists(TOKENS_FILE_PATH):
+        with open(TOKENS_FILE_PATH, "w") as f:
             json.dump([], f)
 
 # send the incoming request to discord when the server gets pinged
@@ -230,6 +247,71 @@ def send_telegram_message(data):
 # A list of files or directories to disallow
 DISALLOWED_FILES = ["main.py", "README.md"]  # add any files you want to block
 
+@app.post("/check-if-available")
+async def check_if_available(request: Request):
+    try:
+        # Read the raw body and print it for debugging
+        body = await request.body()
+        print("Raw Request Body:", body.decode())
+
+        if not body:
+            raise HTTPException(status_code=400, detail="Empty request body")
+
+        # Attempt to parse the JSON body
+        try:
+            data = await request.json()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid JSON format")
+
+        name = data.get("name")
+        if not name:
+            raise HTTPException(status_code=400, detail="Name is required")
+
+        # Load existing tokens
+        tokens = load_tokens()
+
+        # Check if the name is already taken
+        if name in tokens:
+            return JSONResponse(content={"available": False, "message": "Name already taken"})
+
+        return JSONResponse(content={"available": True})
+
+    except Exception as e:
+        print(f"Error in /check-if-available: {str(e)}")
+        return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
+
+# route for name registration
+@app.post("/register")
+async def register_name(request: Request):
+    try:
+        data = await request.json()
+        name = data.get("name")
+        
+        if not name:
+            raise HTTPException(status_code=400, detail="Name is required")
+        
+        # generate token for name
+        token = str(uuid.uuid4()) # using v4 for different strings each time
+
+        # load existing
+        tokens = load_tokens()
+
+        # check if its already been registered
+        if name in tokens:
+            raise HTTPException(status_code=400, detail="Name already registered")
+        
+        # store the name n shit in the file
+        tokens[name] = token
+        save_tokens(tokens)
+        
+        return JSONResponse(content={"message": "Name registered successfully", "token": token})
+
+    except Exception as e:
+        print(f"Error in /register: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# modified to check if the token + name pair is valid
 @app.post("/ping")
 async def receive_ping(request: Request):
     try:
@@ -237,6 +319,17 @@ async def receive_ping(request: Request):
         if not data:
             raise HTTPException(status_code=400, detail="Invalid or missing JSON payload")
 
+        name = data.get("name")
+        token = data.get("token")
+        print(name, token)
+        if not name or not token:
+            raise HTTPException(status_code=400, detail="Name and token are required")
+
+        tokens = load_tokens()
+
+        if name not in tokens or tokens[name] != token:
+            raise HTTPException(status_code=403, detail="Invalid name or token. Please register again.")
+        
         data["timestamp"] = datetime.utcnow().isoformat()
 
         with open(LOG_FILE, "r+") as f:

@@ -2,3 +2,4 @@
 server_log.json
 venv/
 __pycache__/
+tokens.json
