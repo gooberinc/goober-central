@@ -30,3 +30,6 @@ Before running the application, ensure that you have the following:
 
 5. **Open it in a web browser**:
     Once the server is running, open your browser of choice and navigate to `http://{host}:{port}` (e.g., `http://localhost:8000`)
+
+6. **Configure goober**:
+    Once you've confirmed that the server is running, navigate to your existing goober install. Inside `config.py`, update the `VERSION_URL` variable to point to the domain where goober central is hosted.
