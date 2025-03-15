@@ -234,7 +234,7 @@ def send_telegram_message(data):
     # send the message to Telegram
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
-        "text": "message"
+        "text": message
     }
 
     try:
