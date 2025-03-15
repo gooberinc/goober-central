@@ -234,7 +234,7 @@ def send_telegram_message(data):
     # send the message to Telegram
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
-        "text": message
+        "text": "message"
     }
 
     try:
@@ -243,6 +243,25 @@ def send_telegram_message(data):
         print(reponse.text)
     except Exception as e:
         print(f"Failed to send message to Telegram: {str(e)}")
+
+def send_telegram_authfail(data, reason):
+    if TELEGRAM_ENABLED is None:
+        return
+    name = data.get("name", "Unknown")
+    message = (
+        f"Name: {name} failed to authenticate!\n"
+        f"Reason: {reason}"
+    )
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": message
+    }
+    try:
+        response = requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", json=payload)
+        print(response.text)
+    except Exception as e:
+        print(f"Failed to send message to Telegram: {str(e)}")
+
 
 # A list of files or directories to disallow
 DISALLOWED_FILES = ["main.py", "README.md"]  # add any files you want to block
@@ -255,16 +274,19 @@ async def check_if_available(request: Request):
         print("Raw Request Body:", body.decode())
 
         if not body:
+            send_telegram_authfail(data, "Empty request body!")
             raise HTTPException(status_code=400, detail="Empty request body")
 
         # Attempt to parse the JSON body
         try:
             data = await request.json()
         except ValueError:
+            send_telegram_authfail(data, "Invalid JSON Received!")
             raise HTTPException(status_code=400, detail="Invalid JSON format")
 
         name = data.get("name")
         if not name:
+            send_telegram_authfail(data, "No Name Given!")
             raise HTTPException(status_code=400, detail="Name is required")
 
         # Load existing tokens
@@ -272,12 +294,14 @@ async def check_if_available(request: Request):
 
         # Check if the name is already taken
         if name in tokens:
+            send_telegram_authfail(data, "Name is already taken!\nPS. This might mean a bot has started..")
             return JSONResponse(content={"available": False, "message": "Name already taken"})
 
         return JSONResponse(content={"available": True})
 
     except Exception as e:
         print(f"Error in /check-if-available: {str(e)}")
+        send_telegram_authfail(data, "Internal Server Error.")
         return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
 
 # route for name registration
@@ -288,6 +312,7 @@ async def register_name(request: Request):
         name = data.get("name").strip() if data.get("name") else None
         
         if not name:
+            send_telegram_authfail(data, "Name is required!")
             raise HTTPException(status_code=400, detail="Name is required")
         
         # generate token for name
@@ -298,6 +323,7 @@ async def register_name(request: Request):
 
         # check if its already been registered
         if name in tokens:
+            send_telegram_authfail(data, "Name is already registered!")
             raise HTTPException(status_code=400, detail="Name already registered")
         
         # store the name n shit in the file
@@ -311,25 +337,32 @@ async def register_name(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+
+
 # modified to check if the token + name pair is valid
 @app.post("/ping")
 async def receive_ping(request: Request):
     try:
         data = await request.json()
         if not data:
+            send_telegram_authfail(data, "Invalid or missing JSON payload")
             raise HTTPException(status_code=400, detail="Invalid or missing JSON payload")
+            
 
         name = data.get("name")
         token = data.get("token")
         print(name, token)
         if not name or not token:
+            send_telegram_authfail(data, "Name and token are required")
             raise HTTPException(status_code=400, detail="Name and token are required")
+            
 
         tokens = load_tokens()
 
         if name not in tokens or tokens[name] != token:
+            send_telegram_authfail(data, "Invalid name or token. Please register again.")
             raise HTTPException(status_code=403, detail="Invalid name or token. Please register again.")
-        
+            
         data["timestamp"] = datetime.utcnow().isoformat()
 
         with open(LOG_FILE, "r+") as f:
