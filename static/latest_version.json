@@ -1,0 +1,8 @@
+{
+    "version": "0.0.0",
+    "download_url": "https://example.com/goob/bot.py",
+    "config_url": "https://example.com/goob/config.py",
+    "changes": "https://example.com/goob/changes.txt",
+    "hash": "0",
+    "last_modified": "0"
+}
