@@ -285,7 +285,7 @@ async def check_if_available(request: Request):
 async def register_name(request: Request):
     try:
         data = await request.json()
-        name = data.get("name")
+        name = data.get("name").strip() if data.get("name") else None
         
         if not name:
             raise HTTPException(status_code=400, detail="Name is required")
