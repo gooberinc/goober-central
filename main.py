@@ -106,7 +106,9 @@ LOG_FILE = os.path.join(BASE_DIR, "server_log.json")
 # i dont know why i defined it here
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 DISCORD_WEBHOOK_URL = os.getenv("webhookID")
-print(DISCORD_WEBHOOK_URL)
+TELEGRAM_BOT_TOKEN = os.getenv("telegram_token")
+TELEGRAM_CHAT_ID = os.getenv("telegram_id")
+TELEGRAM_ENABLED = os.getenv("use_telegram")
 
 # i need to update some of this shit man
 def ensure_log_file():
@@ -181,6 +183,49 @@ def send_discord_message(data):
     except Exception as e:
         print(f"Failed to send message to Discord: {str(e)}")
 
+def send_telegram_message(data):
+    if TELEGRAM_ENABLED == None:
+        return
+    # get version from json file
+    try:
+        with open("static/latest_version.json", "r") as version_file:
+            latest_version_data = json.load(version_file)
+            latest_version = latest_version_data.get("version", "0.0.0")
+    except Exception as e:
+        print(f"Failed to load version data: {str(e)}")
+        latest_version = "0.0.0"  # fallback
+
+    # get version data from incoming data
+    version = data.get("version", "Unknown")
+    name = data.get("name", "Unknown")
+
+    # version check
+    version_display = version
+    if version != "Unknown" and version > latest_version: 
+        version_display = f"{version} (invalid)" 
+
+    message = (
+        f"Name: {name}\n"
+        f"Timestamp: {data.get('timestamp', 'Unknown')}\n"
+        f"Version: {version_display}\n"
+        f"Slash Commands: {data.get('slash_commands', 'False')}\n"
+        f"Memory File Info:\n"
+        f"   ├ File Size: {data.get('memory_file_info', {}).get('file_size_bytes', 'Unknown')} bytes\n"
+        f"   └ Line Count: {data.get('memory_file_info', {}).get('line_count', 'Unknown')}\n"
+    )
+
+    # send the message to Telegram
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": message
+    }
+
+    try:
+        print("tried")
+        reponse = requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", json=payload)
+        print(reponse.text)
+    except Exception as e:
+        print(f"Failed to send message to Telegram: {str(e)}")
 
 # A list of files or directories to disallow
 DISALLOWED_FILES = ["main.py", "README.md"]  # add any files you want to block
@@ -201,6 +246,7 @@ async def receive_ping(request: Request):
             json.dump(logs, f, indent=4)
 
         send_discord_message(data)
+        send_telegram_message(data)
 
         return JSONResponse(content={"message": "Ping received successfully", "timestamp": data["timestamp"]})
 
