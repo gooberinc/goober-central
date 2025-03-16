@@ -35,6 +35,9 @@ Before running the application, ensure that you have the following:
 6. **Configure goober**:
     Once you've confirmed that the server is running, navigate to your existing goober install. Inside `config.py`, update the `VERSION_URL` variable to point to the domain where goober central is hosted.
 
+> [!IMPORTANT]  
+> Once you self-host Goober Central, version checking and name registration become your responsibility! Not mine!
+
 You're all set!
 If you’d like to configure Telegram alongside Discord, refer to the instructions [here](https://github.com/WhatDidYouExpect/goober-central/blob/master/TELEGRAM.md).
 
