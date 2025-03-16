@@ -62,9 +62,9 @@
   "command_ping_footer": "Richiesto da",
   "command_about_desc": "informazioni",
   "command_about_embed_title": "Informazioni su di me",
-  "command_about_field1": "Nome",
-  "command_about_field2name": "Versione",
-  "command_about_field2value": "Locale: {local_version} \nUltima: {latest_version}",
+  "command_about_embed_field1": "Nome",
+  "command_about_embed_field2name": "Versione",
+  "command_about_embed_field2value": "Locale: {local_version} \nUltima: {latest_version}",
   "command_desc_stats": "statistiche",
   "command_stats_embed_title": "Statistiche del bot",
   "command_stats_embed_desc": "Dati sulla memoria del bot.",
@@ -75,3 +75,4 @@
   "command_stats_embed_field3name": "Informazioni sulle variabili",
   "command_stats_embed_field3value": "Nome: {NAME} \nPrefisso: {PREFIX} \nID Proprietario: {ownerid} \nCooldown: {cooldown_time} \nLinea ping: {PING_LINE} \nMemoria Condivisa Abilitata: {showmemenabled} \nAddestramento Utente Abilitato: {USERTRAIN_ENABLED} \nUltima TT Casuale: {last_random_talk_time} \nCanzone: {song} \nSplashtext: ```{splashtext}```"
 }
+

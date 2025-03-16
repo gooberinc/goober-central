@@ -112,6 +112,47 @@ func saveTokens(tokens map[string]string) error {
 	return ioutil.WriteFile(TOKENS_FILE_PATH, file, 0644)
 }
 
+func sendUpdateNotification(fileHash string) {
+	// Prepare the message for Discord and Telegram
+	message := fmt.Sprintf("The bot.py file has been updated!\nNew Hash: %s", fileHash)
+
+	// Send to Discord
+	embed := map[string]interface{}{
+		"title":       "Bot File Updated",
+		"description": message,
+		"color":       5814783,
+		"footer":      map[string]interface{}{"text": "Bot Activity Log (golang)"},
+	}
+
+	payload := map[string]interface{}{
+		"embeds": []map[string]interface{}{embed},
+	}
+
+	jsonPayload, _ := json.Marshal(payload)
+	resp, err := http.Post(DISCORD_WEBHOOK_URL, "application/json", strings.NewReader(string(jsonPayload)))
+	if err != nil {
+		log.Printf("Failed to send message to Discord: %v", err)
+	} else {
+		defer resp.Body.Close()
+	}
+
+	// Send to Telegram
+	if TELEGRAM_ENABLED != "" {
+		payload := map[string]string{
+			"chat_id": TELEGRAM_CHAT_ID,
+			"text":    message,
+		}
+
+		jsonPayload, _ := json.Marshal(payload)
+		resp, err := http.Post(fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", TELEGRAM_BOT_TOKEN), "application/json", strings.NewReader(string(jsonPayload)))
+		if err != nil {
+			log.Printf("Failed to send message to Telegram: %v", err)
+		} else {
+			defer resp.Body.Close()
+		}
+	}
+}
+
 func startWatchdog() {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -129,16 +170,40 @@ func startWatchdog() {
 				}
 				if event.Op&fsnotify.Write == fsnotify.Write && event.Name == BOT_FILE_PATH {
 					log.Printf("INFO: %s has been modified, updating hash...", BOT_FILE_PATH)
+
+					// Check if the file is empty
+					fileInfo, err := os.Stat(BOT_FILE_PATH)
+					if err != nil {
+						log.Printf("ERROR: Failed to get file info: %v", err)
+						continue
+					}
+					if fileInfo.Size() == 0 {
+						log.Printf("INFO: File is empty, skipping update and notification.")
+						continue
+					}
+
+					// Calculate the file hash
 					fileHash, err := calculateFileHash(BOT_FILE_PATH)
 					if err != nil {
 						log.Printf("ERROR: Failed to calculate file hash: %v", err)
 						continue
 					}
+
+					// Skip if the hash is for an empty file
+					if fileHash == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" {
+						log.Printf("INFO: File is empty, skipping update and notification.")
+						continue
+					}
+
+					// Update the version file
 					if err := updateVersionFile(fileHash); err != nil {
 						log.Printf("ERROR: Failed to update version file: %v", err)
 						continue
 					}
 					log.Printf("INFO: Updated hash: %s", fileHash)
+
+					// Send notification to Discord and Telegram
+					sendUpdateNotification(fileHash)
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {
