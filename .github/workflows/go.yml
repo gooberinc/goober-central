@@ -34,8 +34,8 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: -${{ github.sha }}
-        name: Release -${{ github.sha }}
+        tag_name: v1.0.0-${{ github.sha_short }}
+        name: Release v1.0.0-${{ github.sha_short }}
         draft: false
         prerelease: false
         generate_release_notes: true
