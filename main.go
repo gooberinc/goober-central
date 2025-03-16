@@ -236,6 +236,9 @@ func ensureLogFile() error {
 }
 
 func sendDiscordMessage(data map[string]interface{}) {
+	// fix it ffs
+	fileSize := int(data["memory_file_info"].(map[string]interface{})["file_size_bytes"].(float64))
+
 	embed := map[string]interface{}{
 		"title":       "Bot Activated",
 		"description": "",
@@ -245,7 +248,7 @@ func sendDiscordMessage(data map[string]interface{}) {
 			{"name": "Timestamp", "value": data["timestamp"], "inline": true},
 			{"name": "Version", "value": data["version"], "inline": true},
 			{"name": "Slash Commands", "value": data["slash_commands"], "inline": true},
-			{"name": "Memory File Info", "value": fmt.Sprintf("File size: %v bytes\nLine count: %v", data["memory_file_info"].(map[string]interface{})["file_size_bytes"], data["memory_file_info"].(map[string]interface{})["line_count"]), "inline": false},
+			{"name": "Memory File Info", "value": fmt.Sprintf("File size: %d bytes\nLine count: %v", fileSize, data["memory_file_info"].(map[string]interface{})["line_count"]), "inline": false},
 		},
 		"footer": map[string]interface{}{"text": "Bot Activity Log (golang)"},
 	}
@@ -268,9 +271,12 @@ func sendTelegramMessage(data map[string]interface{}) {
 		return
 	}
 
+	// fuck my big chungus life :broken_heart:
+	fileSize := int(data["memory_file_info"].(map[string]interface{})["file_size_bytes"].(float64))
+
 	message := fmt.Sprintf(
-		"Name: %v\nTimestamp: %v\nVersion: %v\nSlash Commands: %v\nMemory File Info:\n   ├ File Size: %v bytes\n   └ Line Count: %v\n",
-		data["name"], data["timestamp"], data["version"], data["slash_commands"], data["memory_file_info"].(map[string]interface{})["file_size_bytes"], data["memory_file_info"].(map[string]interface{})["line_count"],
+		"Name: %v\nTimestamp: %v\nVersion: %v\nSlash Commands: %v\nMemory File Info:\n   ├ File Size: %d bytes\n   └ Line Count: %v\n",
+		data["name"], data["timestamp"], data["version"], data["slash_commands"], fileSize, data["memory_file_info"].(map[string]interface{})["line_count"],
 	)
 
 	payload := map[string]string{
