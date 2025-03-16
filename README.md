@@ -1,6 +1,6 @@
 # Server Setup
-[!WARNING]  
-This version is no longer being updated. It is slow and clunky. Please switch back to the master branch for production use.
+> [!WARNING]  
+> This version is no longer being updated. It is slow and clunky. Please switch back to the master branch for production use.
 ## Requirements
 Before running the application, ensure that you have the following:
 
