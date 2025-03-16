@@ -30,14 +30,22 @@ jobs:
       - name: Test
         run: go test -v ./...
 
-      - name: Create or Update Release
+      - name: Create Git Tag
+        id: tag
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git tag v1.0.0
+          git push origin v1.0.0
+
+      - name: Create Release
         id: create-release
         uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: v1.0.0
-          name: Release (Actions)
+          name: Release v1.0.0
           draft: false
           prerelease: false
           generate_release_notes: true
