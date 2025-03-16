@@ -9,9 +9,12 @@ Before running the application, ensure that you have the following:
 ## Compilation Instructions
 
 1. **Compile the application**
-   `go build`
+   Run this in your Terminal of choice.
+   ```bash
+   go build
+   ```
 
-2. **Run the compiled executable**
+3. **Run the compiled executable**
    After compilation, you can run it directly:
    ```bash
    ./goober-central`
