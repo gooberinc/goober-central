@@ -29,7 +29,7 @@ Before running the application, ensure that you have the following:
     If you want to compile the application for a different operating system or architecture, use the `GOOS` and `GOARCH` environment variables.
     For example, to compile for Windows on a Linux machine:
    ```bash
-   GOOS=windows GOARCH=amd64 go build -o goober-central.exe`
+   GOOS=windows GOARCH=amd64 go build -o goober-central.exe
    ```
    
 You're all set!
