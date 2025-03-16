@@ -3,9 +3,8 @@
 ## Requirements
 Before running the application, ensure that you have the following:
 
-- Python 3.7 or higher
-- pip (Python package installer)
-- Uvicorn for running the server
+- Go 1.20 or higher
+- Git
 
 ## Setup Instructions
 
@@ -20,19 +19,20 @@ Before running the application, ensure that you have the following:
     `webhookID={discord webhook}`
 
 3. **Install Dependencies**:
-    Install the required dependencies from requirements.txt:
-   `pip install -r requirements.txt`
+    Install the required dependencies from go.mod
+   `go mod tidy`
 
 4. **Run the script**:
     Start the application using uvicorn:
-   ``uvicorn main:app --host {host} --port {port}``
-   Replace `{host}` with your desired host (e.g., `0.0.0.0` for listening on all interfaces) and `{port}` with the desired port number.
+   ``go run main.go``
 
 5. **Open it in a web browser**:
-    Once the server is running, open your browser of choice and navigate to `http://{host}:{port}` (e.g., `http://localhost:8000`)
+    Once the server is running, open your browser of choice and navigate to `http://localhost:9094`)
 
 6. **Configure goober**:
     Once you've confirmed that the server is running, navigate to your existing goober install. Inside `config.py`, update the `VERSION_URL` variable to point to the domain where goober central is hosted.
 
 You're all set!
 If you’d like to configure Telegram alongside Discord, refer to the instructions [here](https://github.com/WhatDidYouExpect/goober-central/blob/master/TELEGRAM.md).
+
+Or if you'd like to compile it into an executable, refer to these instructions [here](https://https://github.com/WhatDidYouExpect/goober-central/blob/master/COMPILING.md)
