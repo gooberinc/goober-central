@@ -35,4 +35,4 @@ Before running the application, ensure that you have the following:
 You're all set!
 If you’d like to configure Telegram alongside Discord, refer to the instructions [here](https://github.com/WhatDidYouExpect/goober-central/blob/master/TELEGRAM.md).
 
-Or if you'd like to compile it into an executable, refer to these instructions [here](https://https://github.com/WhatDidYouExpect/goober-central/blob/master/COMPILING.md)
+Or if you'd like to compile it into an executable, refer to these instructions [here](https://github.com/WhatDidYouExpect/goober-central/blob/master/COMPILING.md)
