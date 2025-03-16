@@ -17,11 +17,11 @@ Before running the application, ensure that you have the following:
 3. **Run the compiled executable**
    After compilation, you can run it directly:
    ```bash
-   ./goober-central`
+   ./goober-central
    ```
    Or if you're a Windows user:
    ```bash
-   `goober-central.exe`
+   goober-central.exe
    ```
 ## Cross-Compilation
 
