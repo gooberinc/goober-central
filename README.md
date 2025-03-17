@@ -33,9 +33,6 @@ Before running the application, ensure that you have the following:
    go run main.go
    ```
 
-> [!TIP]
-> If you're looking to boost its speed even slightly, try downloading the pre-built executables!
-
 5. **Open it in a web browser**:
     Once the server is running, open your browser of choice and navigate to `http://localhost:9094`
 
