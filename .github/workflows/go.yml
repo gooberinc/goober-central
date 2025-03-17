@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'main.go'
+      - '.github/workflows/go.yml'
 
 permissions:
   contents: write
@@ -48,11 +49,15 @@ jobs:
       tag_name: ${{ steps.tag.outputs.tag_name }}
 
   build-and-upload:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     needs: create-release
     strategy:
       matrix:
+        os: [ubuntu-latest, windows-latest] # build for windows and linux
         arch: [amd64, arm64]
+        exclude:
+          - os: windows-latest
+            arch: arm64
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -67,10 +72,10 @@ jobs:
 
       - name: Build
         run: |
-          GOARCH=${{ matrix.arch }} go build \
+          GOOS=${{ matrix.os == 'windows-latest' && 'windows' || 'linux' }} GOARCH=${{ matrix.arch }} go build \
             -ldflags "-X main.BuildDate=$(date -u +'%Y-%m-%dT%H:%M:%SZ') -X main.BuildBranch=$(git rev-parse --abbrev-ref HEAD)" \
             -v \
-            -o ./bin/goober-central-${{ matrix.arch }} ./...
+            -o ./bin/goober-central-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.os == 'windows-latest' && '.exe' || '' }} ./...
 
       - name: Test
         run: go test -v ./...
@@ -81,4 +86,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ needs.create-release.outputs.tag_name }}
-          files: ./bin/goober-central-${{ matrix.arch }}
+          files: ./bin/goober-central-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.os == 'windows-latest' && '.exe' || '' }}
