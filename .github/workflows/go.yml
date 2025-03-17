@@ -54,7 +54,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
-        arch: [amd64]
+        arch: [amd64, arm64]
         exclude:
           - os: windows-latest
             arch: arm64
@@ -82,7 +82,7 @@ jobs:
             GOOS=linux GOARCH=${{ matrix.arch }} go build \
               -ldflags "-X main.BuildDate=$(date -u +'%Y-%m-%dT%H:%M:%SZ') -X main.BuildBranch=$(git rev-parse --abbrev-ref HEAD)" \
               -v \
-              -o ./bin/goober-central-linux-${{ matrix.arch }} ./...
+              -o ./bin/goober-central-${{ matrix.os }}-${{ matrix.arch }} ./...
           fi
 
       - name: Test
