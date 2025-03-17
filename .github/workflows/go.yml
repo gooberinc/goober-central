@@ -82,7 +82,7 @@ jobs:
             GOOS=linux GOARCH=${{ matrix.arch }} go build \
               -ldflags "-X main.BuildDate=$(date -u +'%Y-%m-%dT%H:%M:%SZ') -X main.BuildBranch=$(git rev-parse --abbrev-ref HEAD)" \
               -v \
-              -o ./bin/goober-central-${{ matrix.os }}-${{ matrix.arch }} ./...
+              -o ./bin/goober-central-linux-${{ matrix.arch }} ./...
           fi
 
       - name: Test
