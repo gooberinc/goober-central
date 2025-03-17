@@ -117,7 +117,7 @@ func saveTokens(tokens map[string]string) error {
 func sendUpdateNotification(fileHash string) {
 	message := fmt.Sprintf("Detected Change!\nNew Hash: %s", fileHash)
 	embed := map[string]interface{}{
-		"title":       "Bot File Updated",
+		"title":       "File Updated",
 		"description": message,
 		"color":       5814783,
 		"footer":      map[string]interface{}{"text": "Bot Activity Log (golang)"},
