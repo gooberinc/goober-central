@@ -64,7 +64,11 @@ jobs:
         run: go mod tidy
 
       - name: Build
-        run: go build -v -o goober-central ./...
+        run: |
+          go build \
+            -ldflags "-X main.BuildDate=$(date -u +'%Y-%m-%dT%H:%M:%SZ') -X main.BuildBranch=$(git rev-parse --abbrev-ref HEAD)" \
+            -v \
+            -o ./bin/goober-central ./...
 
       - name: Test
         run: go test -v ./...
@@ -75,4 +79,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ needs.create-release.outputs.tag_name }}
-          files: ./goober-central
+          files: ./bin/goober-central
