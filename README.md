@@ -23,7 +23,7 @@ Before running the application, ensure that you have the following:
    `go mod tidy`
 
 4. **Run the script**:
-    Start the application using uvicorn:
+    Start the application using go:
    ``go run main.go``
 
 > [!TIP]
