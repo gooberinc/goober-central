@@ -9,7 +9,7 @@ Before running the application, ensure that you have the following:
 ## Setup Instructions (Running main.go directly)
 
 > [!TIP]
-> If you're looking for pre-built executables, check out the latest release!
+> If you're looking for pre-built executables, check out the latest release! Just follow step 2.
 
 1. **Clone the Repository**:
    If you haven't already, clone the repository to your local machine:
