@@ -21,7 +21,7 @@ jobs:
         run: |
           TIMESTAMP=$(date +%Y%m%d%H%M%S)
           RANDOM_STRING=$(openssl rand -hex 4)
-          TAG_NAME="v-$TIMESTAMP-$RANDOM_STRING"
+          TAG_NAME="x86_64-$TIMESTAMP-$RANDOM_STRING"
           echo "Generated tag: $TAG_NAME"
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
 
