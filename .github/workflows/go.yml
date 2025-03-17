@@ -52,7 +52,7 @@ jobs:
     needs: create-release
     strategy:
       matrix:
-        arch: [x86_64, arm64]
+        arch: [amd64, arm64]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
