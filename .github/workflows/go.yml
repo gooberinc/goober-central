@@ -50,7 +50,9 @@ jobs:
   build-and-upload:
     runs-on: ubuntu-latest
     needs: create-release
-
+    strategy:
+      matrix:
+        arch: [x86_64, arm64]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -65,10 +67,10 @@ jobs:
 
       - name: Build
         run: |
-          go build \
+          GOARCH=${{ matrix.arch }} go build \
             -ldflags "-X main.BuildDate=$(date -u +'%Y-%m-%dT%H:%M:%SZ') -X main.BuildBranch=$(git rev-parse --abbrev-ref HEAD)" \
             -v \
-            -o ./bin/goober-central ./...
+            -o ./bin/goober-central-${{ matrix.arch }} ./...
 
       - name: Test
         run: go test -v ./...
@@ -79,4 +81,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ needs.create-release.outputs.tag_name }}
-          files: ./bin/goober-central
+          files: ./bin/goober-central-${{ matrix.arch }}
