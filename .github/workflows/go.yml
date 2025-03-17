@@ -53,8 +53,8 @@ jobs:
     needs: create-release
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest] # build for windows and linux
-        arch: [amd64, arm64]
+        os: [ubuntu-latest, windows-latest]
+        arch: [amd64]
         exclude:
           - os: windows-latest
             arch: arm64
@@ -71,11 +71,19 @@ jobs:
         run: go mod tidy
 
       - name: Build
+        shell: bash
         run: |
-          GOOS=${{ matrix.os == 'windows-latest' && 'windows' || 'linux' }} GOARCH=${{ matrix.arch }} go build \
-            -ldflags "-X main.BuildDate=$(date -u +'%Y-%m-%dT%H:%M:%SZ') -X main.BuildBranch=$(git rev-parse --abbrev-ref HEAD)" \
-            -v \
-            -o ./bin/goober-central-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.os == 'windows-latest' && '.exe' || '' }} ./...
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            GOOS=windows GOARCH=${{ matrix.arch }} go build \
+              -ldflags "-X main.BuildDate=$(date -u +'%Y-%m-%dT%H:%M:%SZ') -X main.BuildBranch=$(git rev-parse --abbrev-ref HEAD)" \
+              -v \
+              -o ./bin/goober-central-${{ matrix.os }}-${{ matrix.arch }}.exe ./...
+          else
+            GOOS=linux GOARCH=${{ matrix.arch }} go build \
+              -ldflags "-X main.BuildDate=$(date -u +'%Y-%m-%dT%H:%M:%SZ') -X main.BuildBranch=$(git rev-parse --abbrev-ref HEAD)" \
+              -v \
+              -o ./bin/goober-central-${{ matrix.os }}-${{ matrix.arch }} ./...
+          fi
 
       - name: Test
         run: go test -v ./...
