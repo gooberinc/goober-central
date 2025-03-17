@@ -1,4 +1,4 @@
-package main 
+package main
 
 import (
 	"crypto/sha256"
@@ -415,10 +415,11 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"message": "Name registered successfully", "token": token})
 	})
 
-	r.GET("/info", func(c *gin.Context) {
+	r.POST("/info", func(c *gin.Context) {
 		info := gin.H{
 			"build_date":   BuildDate,
 			"build_branch": BuildBranch,
+			"love_from":    "WhatDidYouExpect",
 		}
 		c.JSON(http.StatusOK, info)
 	})
