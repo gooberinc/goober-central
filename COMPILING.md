@@ -11,7 +11,7 @@ Before running the application, ensure that you have the following:
 1. **Compile the application**
    Run this in your Terminal of choice.
    ```bash
-   go build
+   go build -ldflags "-X main.BuildDate=$(date -u +'%Y-%m-%dT%H:%M:%SZ') -X main.BuildBranch=$(git rev-parse --abbrev-ref HEAD)"
    ```
 
 3. **Run the compiled executable**
