@@ -113,10 +113,7 @@ func saveTokens(tokens map[string]string) error {
 }
 
 func sendUpdateNotification(fileHash string) {
-	// Prepare the message for Discord and Telegram
-	message := fmt.Sprintf("The bot.py file has been updated!\nNew Hash: %s", fileHash)
-
-	// Send to Discord
+	message := fmt.Sprintf("Detected Change!\nNew Hash: %s", fileHash)
 	embed := map[string]interface{}{
 		"title":       "Bot File Updated",
 		"description": message,
@@ -135,8 +132,6 @@ func sendUpdateNotification(fileHash string) {
 	} else {
 		defer resp.Body.Close()
 	}
-
-	// Send to Telegram
 	if TELEGRAM_ENABLED != "" {
 		payload := map[string]string{
 			"chat_id": TELEGRAM_CHAT_ID,
@@ -189,7 +184,7 @@ func startWatchdog() {
 						continue
 					}
 
-					// Skip if the hash is for an empty file
+					// Skip if the hash is for an empty file (this killed me)
 					if fileHash == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" {
 						log.Printf("INFO: File is empty, skipping update and notification.")
 						continue
