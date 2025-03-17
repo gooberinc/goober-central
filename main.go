@@ -238,7 +238,7 @@ func ensureLogFile() error {
 func sendDiscordMessage(data map[string]interface{}) {
 	// fix it ffs
 	fileSize := int(data["memory_file_info"].(map[string]interface{})["file_size_bytes"].(float64))
-
+	// prep embed
 	embed := map[string]interface{}{
 		"title":       "Bot Activated",
 		"description": "",
