@@ -30,6 +30,8 @@ var (
 	TELEGRAM_BOT_TOKEN  string
 	TELEGRAM_CHAT_ID    string
 	TELEGRAM_ENABLED    string
+	BuildDate           string
+	BuildBranch         string
 )
 
 func init() {
@@ -314,6 +316,7 @@ func sendTelegramAuthFail(data map[string]interface{}, reason string) {
 }
 
 func main() {
+	log.Printf("Application built on %s from branch %s\n", BuildDate, BuildBranch)
 	if err := ensureLogFile(); err != nil {
 		log.Fatalf("ERROR: Failed to ensure log file: %v", err)
 	}
@@ -415,6 +418,14 @@ func main() {
 
 		log.Printf("DEBUG: Name %s registered successfully in /register", name)
 		c.JSON(http.StatusOK, gin.H{"message": "Name registered successfully", "token": token})
+	})
+
+	r.GET("/info", func(c *gin.Context) {
+		info := gin.H{
+			"build_date":   BuildDate,
+			"build_branch": BuildBranch,
+		}
+		c.JSON(http.StatusOK, info)
 	})
 
 	r.POST("/ping", func(c *gin.Context) {
