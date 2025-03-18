@@ -1,22 +1,19 @@
-package main 
+package main
 
 import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/gin-gonic/gin"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 )
@@ -27,10 +24,6 @@ var (
 	LATEST_VERSION_PATH string
 	TOKENS_FILE_PATH    string
 	LOG_FILE            string
-	DISCORD_WEBHOOK_URL string
-	TELEGRAM_BOT_TOKEN  string
-	TELEGRAM_CHAT_ID    string
-	TELEGRAM_ENABLED    string
 	BuildDate           string
 	BuildBranch         string
 )
@@ -45,11 +38,6 @@ func init() {
 	LATEST_VERSION_PATH = filepath.Join(BASE_DIR, "static", "latest_version.json")
 	TOKENS_FILE_PATH = filepath.Join(BASE_DIR, "tokens.json")
 	LOG_FILE = filepath.Join(BASE_DIR, "server_log.json")
-
-	DISCORD_WEBHOOK_URL = os.Getenv("webhookID")
-	TELEGRAM_BOT_TOKEN = os.Getenv("telegram_token")
-	TELEGRAM_CHAT_ID = os.Getenv("telegram_id")
-	TELEGRAM_ENABLED = os.Getenv("use_telegram")
 }
 
 func calculateFileHash(filePath string) (string, error) {
@@ -115,42 +103,6 @@ func saveTokens(tokens map[string]string) error {
 	return ioutil.WriteFile(TOKENS_FILE_PATH, file, 0644)
 }
 
-func sendUpdateNotification(fileHash string) {
-	message := fmt.Sprintf("Detected Change!\nNew Hash: %s", fileHash)
-	embed := map[string]interface{}{
-		"title":       "File Updated",
-		"description": message,
-		"color":       5814783,
-		"footer":      map[string]interface{}{"text": "Bot Activity Log (golang)"},
-	}
-
-	payload := map[string]interface{}{
-		"embeds": []map[string]interface{}{embed},
-	}
-
-	jsonPayload, _ := json.Marshal(payload)
-	resp, err := http.Post(DISCORD_WEBHOOK_URL, "application/json", strings.NewReader(string(jsonPayload)))
-	if err != nil {
-		log.Printf("Failed to send message to Discord: %v", err)
-	} else {
-		defer resp.Body.Close()
-	}
-	if TELEGRAM_ENABLED != "" {
-		payload := map[string]string{
-			"chat_id": TELEGRAM_CHAT_ID,
-			"text":    message,
-		}
-
-		jsonPayload, _ := json.Marshal(payload)
-		resp, err := http.Post(fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", TELEGRAM_BOT_TOKEN), "application/json", strings.NewReader(string(jsonPayload)))
-		if err != nil {
-			log.Printf("Failed to send message to Telegram: %v", err)
-		} else {
-			defer resp.Body.Close()
-		}
-	}
-}
-
 func startWatchdog() {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -200,8 +152,6 @@ func startWatchdog() {
 					}
 					log.Printf("INFO: Updated hash: %s", fileHash)
 
-					// Send notification to Discord and Telegram
-					sendUpdateNotification(fileHash)
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {
@@ -233,127 +183,6 @@ func ensureLogFile() error {
 	return nil
 }
 
-func sendDiscordMessage(data map[string]interface{}) {
-	// fix it ffs
-	fileSize := int(data["memory_file_info"].(map[string]interface{})["file_size_bytes"].(float64))
-	// prep embed
-	embed := map[string]interface{}{
-		"title":       "Bot Activated",
-		"description": "",
-		"color":       5814783,
-		"fields": []map[string]interface{}{
-			{"name": "Name", "value": data["name"], "inline": true},
-			{"name": "Timestamp", "value": data["timestamp"], "inline": true},
-			{"name": "Version", "value": data["version"], "inline": true},
-			{"name": "Slash Commands", "value": data["slash_commands"], "inline": true},
-			{"name": "Memory File Info", "value": fmt.Sprintf("File size: %d bytes\nLine count: %v", fileSize, data["memory_file_info"].(map[string]interface{})["line_count"]), "inline": false},
-		},
-		"footer": map[string]interface{}{"text": "Bot Activity Log (golang)"},
-	}
-
-	payload := map[string]interface{}{
-		"embeds": []map[string]interface{}{embed},
-	}
-
-	jsonPayload, _ := json.Marshal(payload)
-	resp, err := http.Post(DISCORD_WEBHOOK_URL, "application/json", strings.NewReader(string(jsonPayload)))
-	if err != nil {
-		log.Printf("Failed to send message to Discord: %v", err)
-		return
-	}
-	defer resp.Body.Close()
-}
-
-func sendTelegramMessage(data map[string]interface{}) {
-	if TELEGRAM_ENABLED == "" {
-		return
-	}
-
-	// fuck my big chungus life :broken_heart:
-	fileSize := int(data["memory_file_info"].(map[string]interface{})["file_size_bytes"].(float64))
-
-	message := fmt.Sprintf(
-		"Name: %v\nTimestamp: %v\nVersion: %v\nSlash Commands: %v\nMemory File Info:\n   ├ File Size: %d bytes\n   └ Line Count: %v\n",
-		data["name"], data["timestamp"], data["version"], data["slash_commands"], fileSize, data["memory_file_info"].(map[string]interface{})["line_count"],
-	)
-
-	payload := map[string]string{
-		"chat_id": TELEGRAM_CHAT_ID,
-		"text":    message,
-	}
-
-	jsonPayload, _ := json.Marshal(payload)
-	resp, err := http.Post(fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", TELEGRAM_BOT_TOKEN), "application/json", strings.NewReader(string(jsonPayload)))
-	if err != nil {
-		log.Printf("Failed to send message to Telegram: %v", err)
-		return
-	}
-	defer resp.Body.Close()
-}
-
-func sendTelegramAuthFail(data map[string]interface{}, reason string) {
-	if TELEGRAM_ENABLED == "" {
-		return
-	}
-
-	message := fmt.Sprintf("Name: %v failed to authenticate!\nReason: %v", data["name"], reason)
-	payload := map[string]string{
-		"chat_id": TELEGRAM_CHAT_ID,
-		"text":    message,
-	}
-
-	jsonPayload, _ := json.Marshal(payload)
-	resp, err := http.Post(fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", TELEGRAM_BOT_TOKEN), "application/json", strings.NewReader(string(jsonPayload)))
-	if err != nil {
-		log.Printf("Failed to send message to Telegram: %v", err)
-		return
-	}
-	defer resp.Body.Close()
-}
-
-func startTelegramBot() {
-	if TELEGRAM_ENABLED == "" {
-		log.Println("Telegram is not enabled. Skipping bot startup.")
-		return
-	}
-
-	bot, err := tgbotapi.NewBotAPI(TELEGRAM_BOT_TOKEN)
-	if err != nil {
-		log.Fatalf("Failed to start Telegram bot: %v", err)
-	}
-
-	bot.Debug = true
-	log.Printf("Authorized on account %s", bot.Self.UserName)
-
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 60
-
-	updates := bot.GetUpdatesChan(u)
-
-	for update := range updates {
-		if update.Message == nil { // fuck my chungus life 2
-			continue
-		}
-
-		switch update.Message.Command() {
-		case "stop":
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Shutting down the server...")
-			bot.Send(msg)
-			log.Println("Received 'stop' command from Telegram. Shutting down...")
-			os.Exit(0)
-
-		case "info":
-			msgText := fmt.Sprintf("Application built on %s from branch %s\n", BuildDate, BuildBranch)
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
-			bot.Send(msg)
-
-		default:
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Unknown command. Available commands: /stop, /info")
-			bot.Send(msg)
-		}
-	}
-}
-
 func main() {
 	log.Printf("Application built on %s from branch %s\n", BuildDate, BuildBranch)
 	if err := ensureLogFile(); err != nil {
@@ -361,14 +190,13 @@ func main() {
 	}
 
 	go startWatchdog()
-	go startTelegramBot()
 
 	r := gin.Default()
 	r.Use(func(c *gin.Context) {
 		log.Printf("Request: %s %s", c.Request.Method, c.Request.URL.Path)
 		c.Next()
 	})
-	r.Static("/", filepath.Join(BASE_DIR, "static"))
+	r.StaticFile("/latest_version.json", filepath.Join(BASE_DIR, "static", "latest_version.json"))
 
 	// CORS middleware
 	r.Use(func(c *gin.Context) {
@@ -386,7 +214,7 @@ func main() {
 		var data map[string]interface{}
 		if err := c.ShouldBindJSON(&data); err != nil {
 			log.Printf("DEBUG: Invalid JSON received in /check-if-available")
-			sendTelegramAuthFail(data, "Invalid JSON Received!")
+
 			c.JSON(http.StatusBadRequest, gin.H{"detail": "Invalid JSON format"})
 			return
 		}
@@ -394,7 +222,7 @@ func main() {
 		name, ok := data["name"].(string)
 		if !ok || name == "" {
 			log.Printf("DEBUG: No name provided in /check-if-available")
-			sendTelegramAuthFail(data, "No Name Given!")
+
 			c.JSON(http.StatusBadRequest, gin.H{"detail": "Name is required"})
 			return
 		}
@@ -408,7 +236,7 @@ func main() {
 
 		if _, exists := tokens[name]; exists {
 			log.Printf("DEBUG: Name %s is already taken in /check-if-available", name)
-			sendTelegramAuthFail(data, "Name is already taken!")
+
 			c.JSON(http.StatusOK, gin.H{"available": false, "message": "Name already taken"})
 			return
 		}
@@ -421,7 +249,7 @@ func main() {
 		var data map[string]interface{}
 		if err := c.ShouldBindJSON(&data); err != nil {
 			log.Printf("DEBUG: Invalid JSON received in /register")
-			sendTelegramAuthFail(data, "Invalid JSON Received!")
+
 			c.JSON(http.StatusBadRequest, gin.H{"detail": "Invalid JSON format"})
 			return
 		}
@@ -429,7 +257,7 @@ func main() {
 		name, ok := data["name"].(string)
 		if !ok || name == "" {
 			log.Printf("DEBUG: No name provided in /register")
-			sendTelegramAuthFail(data, "Name is required!")
+
 			c.JSON(http.StatusBadRequest, gin.H{"detail": "Name is required"})
 			return
 		}
@@ -445,7 +273,7 @@ func main() {
 
 		if _, exists := tokens[name]; exists {
 			log.Printf("DEBUG: Name %s is already registered in /register", name)
-			sendTelegramAuthFail(data, "Name is already registered!")
+
 			c.JSON(http.StatusBadRequest, gin.H{"detail": "Name already registered"})
 			return
 		}
@@ -460,21 +288,11 @@ func main() {
 		log.Printf("DEBUG: Name %s registered successfully in /register", name)
 		c.JSON(http.StatusOK, gin.H{"message": "Name registered successfully", "token": token})
 	})
-
-	r.POST("/info", func(c *gin.Context) {
-		info := gin.H{
-			"build_date":   BuildDate,
-			"build_branch": BuildBranch,
-			"love_from":    "WhatDidYouExpect",
-		}
-		c.JSON(http.StatusOK, info)
-	})
-
 	r.POST("/ping", func(c *gin.Context) {
 		var data map[string]interface{}
 		if err := c.ShouldBindJSON(&data); err != nil {
 			log.Printf("DEBUG: Invalid or missing JSON payload in /ping")
-			sendTelegramAuthFail(data, "Invalid or missing JSON payload")
+
 			c.JSON(http.StatusBadRequest, gin.H{"detail": "Invalid or missing JSON payload"})
 			return
 		}
@@ -482,7 +300,7 @@ func main() {
 		name, ok := data["name"].(string)
 		if !ok || name == "" {
 			log.Printf("DEBUG: Name is required in /ping")
-			sendTelegramAuthFail(data, "Name and token are required")
+
 			c.JSON(http.StatusBadRequest, gin.H{"detail": "Name and token are required"})
 			return
 		}
@@ -490,7 +308,7 @@ func main() {
 		token, ok := data["token"].(string)
 		if !ok || token == "" {
 			log.Printf("DEBUG: Token is required in /ping")
-			sendTelegramAuthFail(data, "Name and token are required")
+
 			c.JSON(http.StatusBadRequest, gin.H{"detail": "Name and token are required"})
 			return
 		}
@@ -504,7 +322,7 @@ func main() {
 
 		if storedToken, exists := tokens[name]; !exists || storedToken != token {
 			log.Printf("DEBUG: Invalid name or token in /ping: name=%s, token=%s", name, token)
-			sendTelegramAuthFail(data, "Invalid name or token. Please register again.")
+
 			c.JSON(http.StatusForbidden, gin.H{"detail": "Invalid name or token. Please register again."})
 			return
 		}
@@ -533,9 +351,6 @@ func main() {
 			c.JSON(http.StatusInternalServerError, gin.H{"detail": "Internal Server Error"})
 			return
 		}
-
-		sendDiscordMessage(data)
-		sendTelegramMessage(data)
 
 		log.Printf("DEBUG: Ping received successfully in /ping: name=%s", name)
 		c.JSON(http.StatusOK, gin.H{"message": "Ping received successfully", "timestamp": data["timestamp"]})
