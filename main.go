@@ -1,4 +1,4 @@
-package main 
+package main
 
 import (
 	"crypto/sha256"
@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -346,6 +347,93 @@ func startTelegramBot() {
 			msgText := fmt.Sprintf("Application built on %s from branch %s\n", BuildDate, BuildBranch)
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
 			bot.Send(msg)
+
+		case "update":
+			fmt.Printf("Updating for OS: %s, Architecture: %s\n", runtime.GOOS, runtime.GOARCH)
+
+			// hot guess
+			var binaryURL string
+			switch runtime.GOOS {
+			case "linux":
+				switch runtime.GOARCH {
+				case "amd64":
+					binaryURL = "https://github.com/gooberinc/goober-central/releases/latest/download/goober-central-ubuntu-latest-amd64"
+				case "arm64":
+					binaryURL = "https://github.com/gooberinc/goober-central/releases/latest/download/goober-central-ubuntu-latest-arm64"
+				default:
+					msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Unsupported architecture for Linux.")
+					bot.Send(msg)
+					continue
+				}
+			case "windows":
+				if runtime.GOARCH == "386" { // Windows LOVES auto compiling for 386 for whatever reason i think i downloaded golang for x32 systems by mistake
+					binaryURL = "https://github.com/gooberinc/goober-central/releases/latest/download/goober-central-windows-latest-amd64.exe"
+				} else if runtime.GOARCH == "amd64" {
+					binaryURL = "https://github.com/gooberinc/goober-central/releases/latest/download/goober-central-windows-latest-amd64.exe"
+				} else {
+					msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Unsupported architecture for Windows.")
+					bot.Send(msg)
+					continue
+				}
+			default:
+				msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Unsupported operating system.")
+				bot.Send(msg)
+				continue
+			}
+
+			// im not making good comments anymore man you can guess
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Downloading the latest release...")
+			bot.Send(msg)
+
+			resp, err := http.Get(binaryURL)
+			if err != nil {
+				msg := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("Failed to download the binary: %v", err))
+				bot.Send(msg)
+				continue
+			}
+			defer resp.Body.Close()
+
+			tempFile, err := ioutil.TempFile("", "goober-central-*.exe")
+			if err != nil {
+				msg := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("Failed to create a temporary file: %v", err))
+				bot.Send(msg)
+				continue
+			}
+			defer os.Remove(tempFile.Name())
+
+			if _, err := io.Copy(tempFile, resp.Body); err != nil {
+				msg := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("Failed to save the binary: %v", err))
+				bot.Send(msg)
+				continue
+			}
+
+			tempFile.Close()
+
+			currentExecutable, err := os.Executable()
+			if err != nil {
+				msg := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("Failed to get the current executable path: %v", err))
+				bot.Send(msg)
+				continue
+			}
+
+			backupFile := currentExecutable + ".bak"
+			if err := os.Rename(currentExecutable, backupFile); err != nil {
+				msg := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("Failed to rename the current binary: %v", err))
+				bot.Send(msg)
+				continue
+			}
+
+			if err := os.Rename(tempFile.Name(), currentExecutable); err != nil {
+				msg := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf("Failed to replace the current binary: %v", err))
+				bot.Send(msg)
+				os.Rename(backupFile, currentExecutable)
+				continue
+			}
+
+			msg = tgbotapi.NewMessage(update.Message.Chat.ID, "Update completed successfully. Restarting the server...")
+			bot.Send(msg)
+
+			os.Exit(0)
 
 		default:
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Unknown command. Available commands: /stop, /info")
