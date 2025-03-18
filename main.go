@@ -16,6 +16,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/gin-gonic/gin"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 )
@@ -310,6 +311,49 @@ func sendTelegramAuthFail(data map[string]interface{}, reason string) {
 	defer resp.Body.Close()
 }
 
+func startTelegramBot() {
+	if TELEGRAM_ENABLED == "" {
+		log.Println("Telegram is not enabled. Skipping bot startup.")
+		return
+	}
+
+	bot, err := tgbotapi.NewBotAPI(TELEGRAM_BOT_TOKEN)
+	if err != nil {
+		log.Fatalf("Failed to start Telegram bot: %v", err)
+	}
+
+	bot.Debug = true
+	log.Printf("Authorized on account %s", bot.Self.UserName)
+
+	u := tgbotapi.NewUpdate(0)
+	u.Timeout = 60
+
+	updates := bot.GetUpdatesChan(u)
+
+	for update := range updates {
+		if update.Message == nil { // fuck my chungus life 2
+			continue
+		}
+
+		switch update.Message.Command() {
+		case "stop":
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Shutting down the server...")
+			bot.Send(msg)
+			log.Println("Received 'stop' command from Telegram. Shutting down...")
+			os.Exit(0)
+
+		case "info":
+			msgText := fmt.Sprintf("Application built on %s from branch %s\n", BuildDate, BuildBranch)
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, msgText)
+			bot.Send(msg)
+
+		default:
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Unknown command. Available commands: /stop, /info")
+			bot.Send(msg)
+		}
+	}
+}
+
 func main() {
 	log.Printf("Application built on %s from branch %s\n", BuildDate, BuildBranch)
 	if err := ensureLogFile(); err != nil {
@@ -317,6 +361,8 @@ func main() {
 	}
 
 	go startWatchdog()
+	go startTelegramBot()
+
 	r := gin.Default()
 	r.Use(func(c *gin.Context) {
 		log.Printf("Request: %s %s", c.Request.Method, c.Request.URL.Path)
