@@ -6,7 +6,10 @@ Before running the application, ensure that you have the following:
 - Go 1.20 or higher
 - Git
 
-## Setup Instructions
+## Setup Instructions (Running main.go directly)
+
+> [!TIP]
+> If you're looking for pre-built executables, check out the latest release! Just follow step 2.
 
 1. **Clone the Repository**:
    If you haven't already, clone the repository to your local machine:
@@ -30,9 +33,6 @@ Before running the application, ensure that you have the following:
    go run main.go
    ```
 
-> [!TIP]
-> If you're looking to boost its speed even slightly, try compiling it!
-
 5. **Open it in a web browser**:
     Once the server is running, open your browser of choice and navigate to `http://localhost:9094`
 
@@ -45,4 +45,4 @@ Before running the application, ensure that you have the following:
 You're all set!
 If you’d like to configure Telegram alongside Discord, refer to the instructions [here](https://github.com/WhatDidYouExpect/goober-central/blob/master/TELEGRAM.md).
 
-Or if you'd like to compile it into an executable, refer to these instructions [here](https://github.com/WhatDidYouExpect/goober-central/blob/master/COMPILING.md)
+Or if you'd like to compile it into an executable yourself, refer to these instructions [here](https://github.com/WhatDidYouExpect/goober-central/blob/master/COMPILING.md)

@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'main.go'
+      - '.github/workflows/go.yml'
 
 permissions:
   contents: write
@@ -21,7 +22,7 @@ jobs:
         run: |
           TIMESTAMP=$(date +%Y%m%d%H%M%S)
           RANDOM_STRING=$(openssl rand -hex 4)
-          TAG_NAME="x86_64-$TIMESTAMP-$RANDOM_STRING"
+          TAG_NAME="x86_64_arm64-$TIMESTAMP-$RANDOM_STRING"
           echo "Generated tag: $TAG_NAME"
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
 
@@ -48,11 +49,15 @@ jobs:
       tag_name: ${{ steps.tag.outputs.tag_name }}
 
   build-and-upload:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     needs: create-release
     strategy:
       matrix:
-        arch: [x86_64, arm64]
+        os: [ubuntu-latest, windows-latest]
+        arch: [amd64, arm64]
+        exclude:
+          - os: windows-latest
+            arch: arm64
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -66,11 +71,19 @@ jobs:
         run: go mod tidy
 
       - name: Build
+        shell: bash
         run: |
-          GOARCH=${{ matrix.arch }} go build \
-            -ldflags "-X main.BuildDate=$(date -u +'%Y-%m-%dT%H:%M:%SZ') -X main.BuildBranch=$(git rev-parse --abbrev-ref HEAD)" \
-            -v \
-            -o ./bin/goober-central-${{ matrix.arch }} ./...
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            GOOS=windows GOARCH=${{ matrix.arch }} go build \
+              -ldflags "-X main.BuildDate=$(date -u +'%Y-%m-%dT%H:%M:%SZ') -X main.BuildBranch=$(git rev-parse --abbrev-ref HEAD)" \
+              -v \
+              -o ./bin/goober-central-${{ matrix.os }}-${{ matrix.arch }}.exe ./...
+          else
+            GOOS=linux GOARCH=${{ matrix.arch }} go build \
+              -ldflags "-X main.BuildDate=$(date -u +'%Y-%m-%dT%H:%M:%SZ') -X main.BuildBranch=$(git rev-parse --abbrev-ref HEAD)" \
+              -v \
+              -o ./bin/goober-central-${{ matrix.os }}-${{ matrix.arch }} ./...
+          fi
 
       - name: Test
         run: go test -v ./...
@@ -81,4 +94,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ needs.create-release.outputs.tag_name }}
-          files: ./bin/goober-central-${{ matrix.arch }}
+          files: ./bin/goober-central-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.os == 'windows-latest' && '.exe' || '' }}
