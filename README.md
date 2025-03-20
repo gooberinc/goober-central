@@ -1,5 +1,8 @@
 # Server Setup
 
+> [!CAUTION]
+> Goober-central will not run unless the locales are detected!
+
 ## Requirements
 Before running the application, ensure that you have the following:
 
