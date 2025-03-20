@@ -1,7 +1,7 @@
 # Server Setup
 
 > [!CAUTION]
-> Goober-central will not run unless the locales are present! Please download the locales from the static/goob folder
+> Goober-central will not run unless the goob folder is present! Please create a new directory called `goob` in the `static/` directory
 
 ## Requirements
 Before running the application, ensure that you have the following:
