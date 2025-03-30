@@ -170,7 +170,6 @@ func startWatchdog() {
 				if event.Op&fsnotify.Write == fsnotify.Write && event.Name == BOT_FILE_PATH {
 					log.Printf("INFO: %s has been modified, updating hash...", BOT_FILE_PATH)
 
-					// Check if the file is empty
 					fileInfo, err := os.Stat(BOT_FILE_PATH)
 					if err != nil {
 						log.Printf("ERROR: Failed to get file info: %v", err)
@@ -181,7 +180,6 @@ func startWatchdog() {
 						continue
 					}
 
-					// Calculate the file hash
 					fileHash, err := calculateFileHash(BOT_FILE_PATH)
 					if err != nil {
 						log.Printf("ERROR: Failed to calculate file hash: %v", err)
@@ -194,14 +192,12 @@ func startWatchdog() {
 						continue
 					}
 
-					// Update the version file
 					if err := updateVersionFile(fileHash); err != nil {
 						log.Printf("ERROR: Failed to update version file: %v", err)
 						continue
 					}
 					log.Printf("INFO: Updated hash: %s", fileHash)
 
-					// Send notification to Discord and Telegram
 					sendUpdateNotification(fileHash)
 				}
 			case err, ok := <-watcher.Errors:
@@ -235,9 +231,22 @@ func ensureLogFile() error {
 }
 
 func sendDiscordMessage(data map[string]interface{}) {
-	// fix it ffs
-	fileSize := int(data["memory_file_info"].(map[string]interface{})["file_size_bytes"].(float64))
-	// prep embed
+
+	memoryFileInfo, _ := data["memory_file_info"].(map[string]interface{})
+	if memoryFileInfo == nil {
+		memoryFileInfo = make(map[string]interface{})
+	}
+
+	fileSize, ok := memoryFileInfo["file_size_bytes"].(float64)
+	if !ok {
+		fileSize = 0
+	}
+
+	lineCount, ok := memoryFileInfo["line_count"]
+	if !ok {
+		lineCount = "unknown"
+	}
+
 	embed := map[string]interface{}{
 		"title":       "Bot Activated",
 		"description": "",
@@ -247,7 +256,9 @@ func sendDiscordMessage(data map[string]interface{}) {
 			{"name": "Timestamp", "value": data["timestamp"], "inline": true},
 			{"name": "Version", "value": data["version"], "inline": true},
 			{"name": "Slash Commands", "value": data["slash_commands"], "inline": true},
-			{"name": "Memory File Info", "value": fmt.Sprintf("File size: %d bytes\nLine count: %v", fileSize, data["memory_file_info"].(map[string]interface{})["line_count"]), "inline": false},
+			{"name": "Memory File Info",
+				"value":  fmt.Sprintf("File size: %d bytes\nLine count: %v", int(fileSize), lineCount),
+				"inline": false},
 		},
 		"footer": map[string]interface{}{"text": "Bot Activity Log (golang)"},
 	}
@@ -256,7 +267,12 @@ func sendDiscordMessage(data map[string]interface{}) {
 		"embeds": []map[string]interface{}{embed},
 	}
 
-	jsonPayload, _ := json.Marshal(payload)
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("Failed to marshal Discord payload: %v", err)
+		return
+	}
+
 	resp, err := http.Post(DISCORD_WEBHOOK_URL, "application/json", strings.NewReader(string(jsonPayload)))
 	if err != nil {
 		log.Printf("Failed to send message to Discord: %v", err)
@@ -559,74 +575,121 @@ func main() {
 	})
 
 	r.POST("/ping", func(c *gin.Context) {
+		log.Println("DEBUG: Received /ping request")
+
 		var data map[string]interface{}
 		if err := c.ShouldBindJSON(&data); err != nil {
-			log.Printf("DEBUG: Invalid or missing JSON payload in /ping")
-			sendTelegramAuthFail(data, "Invalid or missing JSON payload")
-			c.JSON(http.StatusBadRequest, gin.H{"detail": "Invalid or missing JSON payload"})
+			log.Printf("ERROR: Failed to parse JSON in /ping: %v", err)
+			sendTelegramAuthFail(data, "Invalid JSON payload")
+			c.JSON(http.StatusBadRequest, gin.H{
+				"detail": "Invalid JSON payload",
+				"error":  err.Error(),
+			})
 			return
 		}
+		log.Printf("DEBUG: Received data: %+v", data)
 
 		name, ok := data["name"].(string)
 		if !ok || name == "" {
-			log.Printf("DEBUG: Name is required in /ping")
-			sendTelegramAuthFail(data, "Name and token are required")
-			c.JSON(http.StatusBadRequest, gin.H{"detail": "Name and token are required"})
+			errMsg := "Name is required and must be a string"
+			log.Printf("ERROR: %s", errMsg)
+			sendTelegramAuthFail(data, errMsg)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"detail":        errMsg,
+				"received_name": data["name"],
+			})
 			return
 		}
 
 		token, ok := data["token"].(string)
 		if !ok || token == "" {
-			log.Printf("DEBUG: Token is required in /ping")
-			sendTelegramAuthFail(data, "Name and token are required")
-			c.JSON(http.StatusBadRequest, gin.H{"detail": "Name and token are required"})
+			errMsg := "Token is required and must be a string"
+			log.Printf("ERROR: %s", errMsg)
+			sendTelegramAuthFail(data, errMsg)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"detail":         errMsg,
+				"received_token": data["token"],
+			})
 			return
+		}
+
+		memFileInfo, ok := data["memory_file_info"].(map[string]interface{})
+		if !ok {
+			log.Printf("WARN: memory_file_info missing or invalid in payload")
+			// Either return error or provide defaults
+			memFileInfo = map[string]interface{}{
+				"file_size_bytes": 0,
+				"line_count":      0,
+			}
+			data["memory_file_info"] = memFileInfo
 		}
 
 		tokens, err := loadTokens()
 		if err != nil {
-			log.Printf("DEBUG: Failed to load tokens in /ping: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"detail": "Internal Server Error"})
+			log.Printf("ERROR: Failed to load tokens: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"detail": "Internal Server Error",
+				"error":  err.Error(),
+			})
 			return
 		}
 
 		if storedToken, exists := tokens[name]; !exists || storedToken != token {
-			log.Printf("DEBUG: Invalid name or token in /ping: name=%s, token=%s", name, token)
-			sendTelegramAuthFail(data, "Invalid name or token. Please register again.")
-			c.JSON(http.StatusForbidden, gin.H{"detail": "Invalid name or token. Please register again."})
+			log.Printf("ERROR: Invalid token for name '%s'", name)
+			sendTelegramAuthFail(data, "Invalid name or token")
+			c.JSON(http.StatusForbidden, gin.H{
+				"detail": "Invalid name or token",
+				"name":   name,
+			})
 			return
 		}
 
 		data["timestamp"] = time.Now().UTC().Format(time.RFC3339)
 
-		logs := []map[string]interface{}{}
-		if file, err := ioutil.ReadFile(LOG_FILE); err == nil {
-			if err := json.Unmarshal(file, &logs); err != nil {
-				log.Printf("DEBUG: Failed to unmarshal logs in /ping: %v", err)
-				c.JSON(http.StatusInternalServerError, gin.H{"detail": "Internal Server Error"})
-				return
+		var logs []map[string]interface{}
+		if fileContent, err := ioutil.ReadFile(LOG_FILE); err == nil {
+			if err := json.Unmarshal(fileContent, &logs); err != nil {
+				log.Printf("ERROR: Failed to parse log file: %v", err)
+				logs = []map[string]interface{}{}
 			}
+		} else {
+			log.Printf("WARN: Could not read log file, creating new one: %v", err)
+			logs = []map[string]interface{}{}
 		}
 
 		logs = append([]map[string]interface{}{data}, logs...)
 		file, err := json.MarshalIndent(logs, "", "    ")
 		if err != nil {
-			log.Printf("DEBUG: Failed to marshal logs in /ping: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"detail": "Internal Server Error"})
+			log.Printf("ERROR: Failed to marshal logs: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"detail": "Internal Server Error",
+				"error":  err.Error(),
+			})
 			return
 		}
 
 		if err := ioutil.WriteFile(LOG_FILE, file, 0644); err != nil {
-			log.Printf("DEBUG: Failed to write logs in /ping: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"detail": "Internal Server Error"})
+			log.Printf("ERROR: Failed to write logs: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"detail": "Internal Server Error",
+				"error":  err.Error(),
+			})
 			return
 		}
 
-		sendDiscordMessage(data)
-		sendTelegramMessage(data)
+		go func() {
+			if err := recover(); err != nil {
+				log.Printf("ERROR: Panic in notification sending: %v", err)
+			}
+			sendDiscordMessage(data)
+			sendTelegramMessage(data)
+		}()
 
-		log.Printf("DEBUG: Ping received successfully in /ping: name=%s", name)
-		c.JSON(http.StatusOK, gin.H{"message": "Ping received successfully", "timestamp": data["timestamp"]})
+		log.Printf("INFO: Successfully processed ping from %s", name)
+		c.JSON(http.StatusOK, gin.H{
+			"message":   "Ping received successfully",
+			"timestamp": data["timestamp"],
+		})
 	})
 
 	log.Println("Starting server on :9094...")
