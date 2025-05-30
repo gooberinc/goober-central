@@ -722,7 +722,7 @@ func main() {
 	r.StaticFile("/latest_version.json", "./static/latest_version.json") // serve latest_version.json
 	r.Static("/imgs", "./static/imgs")
 	r.StaticFile("/robots.txt", "./static/robots.txt")
-
+	r.Static("/goob", "./static/goob")
 
 
 	
