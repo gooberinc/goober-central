@@ -170,6 +170,7 @@ func startWatchdog() {
 				if event.Op&fsnotify.Write == fsnotify.Write && event.Name == BOT_FILE_PATH {
 					log.Printf("INFO: %s has been modified, updating hash...", BOT_FILE_PATH)
 
+					// Check if the file is empty
 					fileInfo, err := os.Stat(BOT_FILE_PATH)
 					if err != nil {
 						log.Printf("ERROR: Failed to get file info: %v", err)
@@ -180,6 +181,7 @@ func startWatchdog() {
 						continue
 					}
 
+					// Calculate the file hash
 					fileHash, err := calculateFileHash(BOT_FILE_PATH)
 					if err != nil {
 						log.Printf("ERROR: Failed to calculate file hash: %v", err)
@@ -192,12 +194,14 @@ func startWatchdog() {
 						continue
 					}
 
+					// Update the version file
 					if err := updateVersionFile(fileHash); err != nil {
 						log.Printf("ERROR: Failed to update version file: %v", err)
 						continue
 					}
 					log.Printf("INFO: Updated hash: %s", fileHash)
 
+					// Send notification to Discord and Telegram
 					sendUpdateNotification(fileHash)
 				}
 			case err, ok := <-watcher.Errors:
@@ -231,54 +235,57 @@ func ensureLogFile() error {
 }
 
 func sendDiscordMessage(data map[string]interface{}) {
+    // Safely get memory_file_info with nil checks
+    memoryFileInfo, _ := data["memory_file_info"].(map[string]interface{})
+    if memoryFileInfo == nil {
+        memoryFileInfo = make(map[string]interface{})
+    }
 
-	memoryFileInfo, _ := data["memory_file_info"].(map[string]interface{})
-	if memoryFileInfo == nil {
-		memoryFileInfo = make(map[string]interface{})
-	}
+    // Safely get file_size_bytes with default value
+    fileSize, ok := memoryFileInfo["file_size_bytes"].(float64)
+    if !ok {
+        fileSize = 0 // Default value if missing or wrong type
+    }
 
-	fileSize, ok := memoryFileInfo["file_size_bytes"].(float64)
-	if !ok {
-		fileSize = 0
-	}
+    // Safely get line_count with default value
+    lineCount, ok := memoryFileInfo["line_count"]
+    if !ok {
+        lineCount = "unknown"
+    }
 
-	lineCount, ok := memoryFileInfo["line_count"]
-	if !ok {
-		lineCount = "unknown"
-	}
+    // Create embed with safe values
+    embed := map[string]interface{}{
+        "title":       "Bot Activated",
+        "description": "",
+        "color":       5814783,
+        "fields": []map[string]interface{}{
+            {"name": "Name", "value": data["name"], "inline": true},
+            {"name": "Timestamp", "value": data["timestamp"], "inline": true},
+            {"name": "Version", "value": data["version"], "inline": true},
+            {"name": "Slash Commands", "value": data["slash_commands"], "inline": true},
+            {"name": "Memory File Info", 
+             "value": fmt.Sprintf("File size: %d bytes\nLine count: %v", int(fileSize), lineCount), 
+             "inline": false},
+        },
+        "footer": map[string]interface{}{"text": "Bot Activity Log (golang)"},
+    }
 
-	embed := map[string]interface{}{
-		"title":       "Bot Activated",
-		"description": "",
-		"color":       5814783,
-		"fields": []map[string]interface{}{
-			{"name": "Name", "value": data["name"], "inline": true},
-			{"name": "Timestamp", "value": data["timestamp"], "inline": true},
-			{"name": "Version", "value": data["version"], "inline": true},
-			{"name": "Slash Commands", "value": data["slash_commands"], "inline": true},
-			{"name": "Memory File Info",
-				"value":  fmt.Sprintf("File size: %d bytes\nLine count: %v", int(fileSize), lineCount),
-				"inline": false},
-		},
-		"footer": map[string]interface{}{"text": "Bot Activity Log (golang)"},
-	}
+    payload := map[string]interface{}{
+        "embeds": []map[string]interface{}{embed},
+    }
 
-	payload := map[string]interface{}{
-		"embeds": []map[string]interface{}{embed},
-	}
+    jsonPayload, err := json.Marshal(payload)
+    if err != nil {
+        log.Printf("Failed to marshal Discord payload: %v", err)
+        return
+    }
 
-	jsonPayload, err := json.Marshal(payload)
-	if err != nil {
-		log.Printf("Failed to marshal Discord payload: %v", err)
-		return
-	}
-
-	resp, err := http.Post(DISCORD_WEBHOOK_URL, "application/json", strings.NewReader(string(jsonPayload)))
-	if err != nil {
-		log.Printf("Failed to send message to Discord: %v", err)
-		return
-	}
-	defer resp.Body.Close()
+    resp, err := http.Post(DISCORD_WEBHOOK_URL, "application/json", strings.NewReader(string(jsonPayload)))
+    if err != nil {
+        log.Printf("Failed to send message to Discord: %v", err)
+        return
+    }
+    defer resp.Body.Close()
 }
 
 func sendTelegramMessage(data map[string]interface{}) {
@@ -472,7 +479,16 @@ func main() {
 		log.Printf("Request: %s %s", c.Request.Method, c.Request.URL.Path)
 		c.Next()
 	})
-	r.Static("/", filepath.Join(BASE_DIR, "static"))
+
+	r.GET("/alert", func(c *gin.Context) {
+	content, err := os.ReadFile("status.txt")
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Failed to read status")
+		return
+	}
+	c.Data(http.StatusOK, "text/plain; charset=utf-8", content)
+})
+
 
 	// CORS middleware
 	r.Use(func(c *gin.Context) {
@@ -486,6 +502,8 @@ func main() {
 		}
 		c.Next()
 	})
+
+
 	r.POST("/check-if-available", func(c *gin.Context) {
 		var data map[string]interface{}
 		if err := c.ShouldBindJSON(&data); err != nil {
@@ -575,6 +593,7 @@ func main() {
 	})
 
 	r.POST("/ping", func(c *gin.Context) {
+		// First log that we received a ping request
 		log.Println("DEBUG: Received /ping request")
 
 		var data map[string]interface{}
@@ -587,32 +606,35 @@ func main() {
 			})
 			return
 		}
+	
+		// Log the received data for debugging
 		log.Printf("DEBUG: Received data: %+v", data)
-
+	
 		name, ok := data["name"].(string)
 		if !ok || name == "" {
 			errMsg := "Name is required and must be a string"
 			log.Printf("ERROR: %s", errMsg)
 			sendTelegramAuthFail(data, errMsg)
 			c.JSON(http.StatusBadRequest, gin.H{
-				"detail":        errMsg,
+				"detail": errMsg,
 				"received_name": data["name"],
 			})
 			return
 		}
-
+	
 		token, ok := data["token"].(string)
 		if !ok || token == "" {
 			errMsg := "Token is required and must be a string"
 			log.Printf("ERROR: %s", errMsg)
 			sendTelegramAuthFail(data, errMsg)
 			c.JSON(http.StatusBadRequest, gin.H{
-				"detail":         errMsg,
+				"detail": errMsg,
 				"received_token": data["token"],
 			})
 			return
 		}
-
+	
+		// Add more defensive programming for memory_file_info
 		memFileInfo, ok := data["memory_file_info"].(map[string]interface{})
 		if !ok {
 			log.Printf("WARN: memory_file_info missing or invalid in payload")
@@ -623,7 +645,7 @@ func main() {
 			}
 			data["memory_file_info"] = memFileInfo
 		}
-
+	
 		tokens, err := loadTokens()
 		if err != nil {
 			log.Printf("ERROR: Failed to load tokens: %v", err)
@@ -633,7 +655,7 @@ func main() {
 			})
 			return
 		}
-
+	
 		if storedToken, exists := tokens[name]; !exists || storedToken != token {
 			log.Printf("ERROR: Invalid token for name '%s'", name)
 			sendTelegramAuthFail(data, "Invalid name or token")
@@ -643,20 +665,22 @@ func main() {
 			})
 			return
 		}
-
+	
 		data["timestamp"] = time.Now().UTC().Format(time.RFC3339)
-
+	
+		// Handle log file operations with more error checking
 		var logs []map[string]interface{}
 		if fileContent, err := ioutil.ReadFile(LOG_FILE); err == nil {
 			if err := json.Unmarshal(fileContent, &logs); err != nil {
 				log.Printf("ERROR: Failed to parse log file: %v", err)
+				// Initialize empty logs instead of failing
 				logs = []map[string]interface{}{}
 			}
 		} else {
 			log.Printf("WARN: Could not read log file, creating new one: %v", err)
 			logs = []map[string]interface{}{}
 		}
-
+	
 		logs = append([]map[string]interface{}{data}, logs...)
 		file, err := json.MarshalIndent(logs, "", "    ")
 		if err != nil {
@@ -667,7 +691,7 @@ func main() {
 			})
 			return
 		}
-
+	
 		if err := ioutil.WriteFile(LOG_FILE, file, 0644); err != nil {
 			log.Printf("ERROR: Failed to write logs: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -676,7 +700,8 @@ func main() {
 			})
 			return
 		}
-
+	
+		// Send notifications with error handling
 		go func() {
 			if err := recover(); err != nil {
 				log.Printf("ERROR: Panic in notification sending: %v", err)
@@ -684,14 +709,23 @@ func main() {
 			sendDiscordMessage(data)
 			sendTelegramMessage(data)
 		}()
-
+	
 		log.Printf("INFO: Successfully processed ping from %s", name)
 		c.JSON(http.StatusOK, gin.H{
 			"message":   "Ping received successfully",
 			"timestamp": data["timestamp"],
 		})
 	})
+	
+	r.StaticFile("/", "./static/index.html")  // serve index.html at root
+	r.Static("/static", "./static")           // serve other files under /static/
+	r.StaticFile("/latest_version.json", "./static/latest_version.json") // serve latest_version.json
+	r.Static("/imgs", "./static/imgs")
+	r.StaticFile("/robots.txt", "./static/robots.txt")
 
+
+
+	
 	log.Println("Starting server on :9094...")
 	if err := r.Run(":9094"); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
